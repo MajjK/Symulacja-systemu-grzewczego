@@ -1,4 +1,3 @@
-
 #include "stdafx.h"
 #include "draw2.h"
 #include <vector>
@@ -18,7 +17,7 @@
 HINSTANCE hInst;								// current instance
 TCHAR szTitle[MAX_LOADSTRING];					// The title bar text
 TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
-int ignore, logs, steps, type, Time = 1000;
+int ignore, logs, steps, type, Time = 1700;
 double gravity, U;
 float time_M, time_S;
 
@@ -65,18 +64,44 @@ LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK	Buttons(HWND, UINT, WPARAM, LPARAM);
 
+
+double Heat_flow(Point T1, Point T2, double R) {
+	return ((T1.Y- T2.Y) / R);
+}
+
+
+
+
 void Input(int type) {
+	
+	data_U.clear();
+
 	switch (type) {
-		case 0:
+		case 0:  // problem z rysowaniem, w forze jest i - 10
+			for (int i = 0, k = 0; i < Time; i++) {
+				if ((i >= k*100) && (i < k*100 + 100)) {
+					data_U.push_back(Point(i, U));
+				}
+				else if ( i % 100 == 0)
+				k += 2;
+				else{	
+					data_U.push_back(Point(i, 0));
+				}
+			}
 			break;
+
 		case 1:
 			for (int i = 0; i < Time; i++) {
-				data_U.push_back(Point(Time, U * 1));
+				data_U.push_back(Point(i, U));
 			}
+			break;
 
-			break;
 		case 2:
+			for (int i = 0; i < Time; i++) {
+				data_U.push_back(Point(i, U*sin(i/31.847)+U));
+			}
 			break;
+
 		default:
 			break;
 	}
@@ -151,15 +176,11 @@ void check2() {
 
 
 
-
-
-
-
 void MyOnPaint(HDC hdc, status status)
 {
 	steps = 0;
 	Graphics graphics(hdc);
-	Pen pen(Color(255, 0, 0, 255));
+	Pen pen1(Color(255, 0, 0, 255));
 	Pen pen2(Color(255, 255, 0, 0));
 	Pen pen3(Color(255, 0, 255, 0));
 	Pen chart1(Color(200, 34, 100, 140), 2);
@@ -175,9 +196,9 @@ void MyOnPaint(HDC hdc, status status)
 	graphics.DrawLine(&chart1, 5, 100 * status.amplitude, 1600, 100 * status.amplitude);
 	for (int i = 50; i < 850; i += 50)graphics.DrawLine(&chart2, 5, i, 1600, i);
 	for (int i = 5; i < 2300; i += 50*status.time_signature)graphics.DrawLine(&chart2, i, 620, i, 660);
-	for (int i = ignore+1; i < 2299; i++) {
+	for (int i = ignore + 1; i < Time - 10; i++) {
 		calc_time(i);
-		if (i != 2298)calc_steps(i);
+		if (i != Time - 11)calc_steps(i);
 
 // Pobieranie danych do temperatur
 		std::ostringstream strs, strs2, strs3, grav, kroki, czas_M, czas_S;
@@ -191,7 +212,7 @@ void MyOnPaint(HDC hdc, status status)
 		std::wstring stemp2 = std::wstring(str2.begin(), str2.end());
 		LPCWSTR sw2 = stemp2.c_str();
 
-		strs3 << data_U[100].Y;
+		strs3 << data_U[200].Y;
 		std::string str3 = strs3.str();
 		std::wstring stemp3 = std::wstring(str3.begin(), str3.end());
 		LPCWSTR sw3 = stemp3.c_str();
@@ -203,13 +224,13 @@ void MyOnPaint(HDC hdc, status status)
 		TextOut(hdc, 410, 720, sw2, 6);
 		TextOut(hdc, 350, 720, TEXT("T2 : "), 6);
 
-		TextOut(hdc, 500, 640, TEXT("Wejœcie:"), 9);
+		TextOut(hdc, 500, 640, TEXT("WejÅ›cie:"), 9);
 		TextOut(hdc, 800, 640, TEXT("Zmienna:"), 9);
 		TextOut(hdc, 870, 640, sw3, 3);
 
-
-		if (status.drawY)graphics.DrawLine(&pen2, Point((data_y[i - 1].X - ignore)*status.time_signature+5, data_y[i - 1].Y*status.amplitude), Point((data_y[i].X - ignore)*status.time_signature+5, data_y[i].Y*status.amplitude));
-		if (status.drawZ)graphics.DrawLine(&pen3, Point((data_z[i - 1].X - ignore)*status.time_signature+5, data_z[i - 1].Y*status.amplitude), Point((data_z[i].X - ignore) *status.time_signature+5, data_z[i].Y*status.amplitude));
+    	if (status.drawX)graphics.DrawLine(&pen1, Point((data_U[i - 1].X), (-1) * data_U[i - 1].Y + 200), Point((data_U[i].X),  (-1) * data_U[i].Y + 200));
+		if (status.drawY)graphics.DrawLine(&pen2, Point((data_y[i - 1].X - ignore)+5, data_y[i - 1].Y), Point((data_y[i].X - ignore)+5, data_y[i].Y));
+	//	if (status.drawZ)graphics.DrawLine(&pen3, Point((data_z[i - 1].X - ignore)*status.time_signature+5, data_z[i - 1].Y), Point((data_z[i].X - ignore) *status.time_signature+5, data_z[i].Y));
 		if (CHART.realtime)Sleep(10);
 	}
 
@@ -234,7 +255,7 @@ void getData()
 {
 	std::ifstream file;
 	file.open("outputRobotForwardB02.log");
-	double koniec, x, y, z;
+	double x, y, z;
 	double suma = 0;
 	std::string pomin;
 	logs = 0;
@@ -248,7 +269,6 @@ void getData()
 
 		acceleration log = { sqrt(x*x + y*y + z*z), false };
 		data_acc.push_back(log);
-	//	data_x.push_back(Point(logs, (abs((x * 1000) - 200)) / 2));
 		data_y.push_back(Point(logs, (abs((y * 1000) - 200)) / 2));
 		data_z.push_back(Point(logs, (abs((z * 1000) - 200)) / 2));
 		logs++;
@@ -317,6 +337,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 	hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_DRAW));
 
 	// Main message loop:
+	Begin();
 	while (GetMessage(&msg, NULL, 0, 0))
 	{
 		if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
@@ -428,7 +449,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 		NULL);
 
 	hwndButton = CreateWindow(TEXT("button"),
-		TEXT("Strumieñ U(t)"),
+		TEXT("StrumieÅ„ U(t)"),
 		WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
 		620, 670,
 		100, 30,
@@ -437,7 +458,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 		hInstance,
 		NULL);
 
-	hwndButton = CreateWindowEx(NULL, TEXT("button"), TEXT("Wykres oœ X"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 800, 670, 110, 20, hWnd, (HMENU)ID_CHECKBOX1, hInstance, NULL);
+	hwndButton = CreateWindowEx(NULL, TEXT("button"), TEXT("Wykresy"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 800, 670, 110, 20, hWnd, (HMENU)ID_CHECKBOX1, hInstance, NULL);
 
 
 	hwndText0 = CreateWindowEx(ES_NUMBER, TEXT("EDIT"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER, 70, 675, 80, 20,
@@ -542,31 +563,27 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			Input(type);
 			GlobalFree(Bufor);
 			break;
-		case ID_BUTTON7:
-			GetWindowText(hwndText1, Bufor, 5);
-			wcstombs(bufor, Bufor, 5);
-			ignore = atoi(bufor);
-			GlobalFree(Bufor);
-			calc_gravity();
-			repaintWindow(hWnd, hdc, ps, NULL, CHART);
-			break;
 		case ID_CHECKBOX1:
-			WM_XBUTTONDOWN;
-			if (CHART.drawX)CHART.drawX = false;
-			else	CHART.drawX = true;
+	//		WM_XBUTTONDOWN;  do usuniecia ?
+			//Tutaj funkcje wyliczajace temperatury t1 i t2
+
+
+
+
+
 			repaintWindow(hWnd, hdc, ps, NULL, CHART);
 			break;
 		case ID_RBUTTON0:
-		//	KillTimer(hWnd, TMR_1);
 			type=0;
+			Input(type);
 			break;
 		case ID_RBUTTON1:
 			type=1;
-
+			Input(type);
 			break;
 		case ID_RBUTTON2:
 			type=2;
-
+			Input(type);
 			break;
 		default:
 			return DefWindowProc(hWnd, message, wParam, lParam);
