@@ -13,13 +13,11 @@
 #define MAX_LOADSTRING 100
 #define TMR_1 1
 
-// Global Variables:
-HINSTANCE hInst;								// current instance
+HINSTANCE hInst;								
 TCHAR szTitle[MAX_LOADSTRING];					// The title bar text
 TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
-int ignore, logs, steps, type, Time = 1700;
-double gravity, U;
-float time_M, time_S;
+int type, Time = 1700;
+double U;
 
 struct status
 {
@@ -31,13 +29,6 @@ struct status
 	bool realtime = false;
 }CHART;
 
-
-struct acceleration
-{
-	double value;
-	bool movement;
-};
-
 struct pojemnosc
 {	
 	std::vector<Point> T;
@@ -45,19 +36,17 @@ struct pojemnosc
 	double R;
 };
 
-// buttons
+
 HWND hwndButton;
 HWND hwndText0, hwndText1, hwndText2, hwndText3, hwndText4;
-// sent data
-int col = 0;
-std::vector<acceleration> data_acc;
+
+
 std::vector<Point> data_U;
-std::vector<Point> data_y;
-std::vector<Point> data_z;
-pojemnosc Wall, Chamber;
+std::vector<Point> data;
+pojemnosc Wall, Chamber, Environment;
 RECT drawArea1 = { 5, 5, 1660, 1200 };
 RECT drawArea2 = { 10, 570, 400, 600 };
-// Forward declarations of functions included in this code module:
+
 ATOM				MyRegisterClass(HINSTANCE hInstance);
 BOOL				InitInstance(HINSTANCE, int);
 LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
@@ -70,13 +59,30 @@ double Heat_flow(Point T1, Point T2, double R) {
 }
 
 
+double integration(std::vector<Point> Function, int i) {
+
+	double integral = 0, acc = 1000, h = i / acc;
+
+	for (int j = 1; j < acc; j++)
+	{
+		integral = integral + Function[j * h].Y;
+	}
+
+	integral = integral + Function[0].Y / 2;
+	integral = integral + Function[i].Y / 2;
+	integral = integral * h;
+
+	return integral;
+}
 
 
 void Input(int type) {
 	
 	data_U.clear();
+	data.clear();
 
 	switch (type) {
+
 		case 0:  // problem z rysowaniem, w forze jest i - 10
 			for (int i = 0, k = 0; i < Time; i++) {
 				if ((i >= k*100) && (i < k*100 + 100)) {
@@ -88,18 +94,25 @@ void Input(int type) {
 					data_U.push_back(Point(i, 0));
 				}
 			}
+
+			for (int i = 0; i < Time - 10; i++) 
+				data.push_back(Point(i, integration(data_U , i)));
 			break;
 
 		case 1:
 			for (int i = 0; i < Time; i++) {
 				data_U.push_back(Point(i, U));
 			}
+			for (int i = 0; i < Time - 10; i++)
+				data.push_back(Point(i, integration(data_U, i)));
 			break;
 
 		case 2:
 			for (int i = 0; i < Time; i++) {
-				data_U.push_back(Point(i, U*sin(i/31.847)+U));
+				data_U.push_back(Point(i, (U/2)*sin(i/31.847) + U/2));
 			}
+			for (int i = 0; i < Time - 10; i++)
+				data.push_back(Point(i, integration(data_U, i)));
 			break;
 
 		default:
@@ -108,77 +121,8 @@ void Input(int type) {
 }
 
 
-
-
-void calc_gravity() {
-	double sum = 0;
-	int reject = 0;
-
-	for (int i = ignore; i < logs; i++) {
-		if (data_acc[i].movement == false)
-			sum = sum + data_acc[i].value;
-		else
-			reject++;
-	}
-	gravity = sum / (logs - ignore - reject);
-}
-
-
-void calc_time(int act) {
-	float count_M = 0;
-	float count_S = 0;
-	for (int i = ignore; i <act; i++) {
-		if (data_acc[i].movement == true)
-			count_M++;
-		else count_S++;
-	}
-	time_M = count_M / 25;
-	time_S = count_S / 25;
-}
-
-
-void calc_steps(int act) {
-	if ((data_acc[act + 1].movement == true) && (data_acc[act].movement == false))
-		steps++;
-}
-
-
-bool check(double value)
-{
-	if ((value - gravity < -0.115) || (value - gravity > 0.115)) {
-		return true;
-	}
-	else
-		return false;
-}
-
-
-void check2() {
-	for (int i = 1; i < logs / 10; i++) {
-		int number = 0;
-		bool movement;
-
-		for (int j = 0; j < 10; j++) {
-			if (data_acc[10 * i + j].movement == true)
-				number++;
-
-			if (number > 3) {
-				movement = true;
-			}
-			else
-				movement = false;
-		}
-
-		for (int j = -10; j < 0; j++)
-			data_acc[10 * i + j].movement = movement;
-	}
-}
-
-
-
 void MyOnPaint(HDC hdc, status status)
 {
-	steps = 0;
 	Graphics graphics(hdc);
 	Pen pen1(Color(255, 0, 0, 255));
 	Pen pen2(Color(255, 255, 0, 0));
@@ -196,9 +140,8 @@ void MyOnPaint(HDC hdc, status status)
 	graphics.DrawLine(&chart1, 5, 100 * status.amplitude, 1600, 100 * status.amplitude);
 	for (int i = 50; i < 850; i += 50)graphics.DrawLine(&chart2, 5, i, 1600, i);
 	for (int i = 5; i < 2300; i += 50*status.time_signature)graphics.DrawLine(&chart2, i, 620, i, 660);
-	for (int i = ignore + 1; i < Time - 10; i++) {
-		calc_time(i);
-		if (i != Time - 11)calc_steps(i);
+	for (int i = 1; i < Time - 10; i++) {
+	
 
 // Pobieranie danych do temperatur
 		std::ostringstream strs, strs2, strs3, grav, kroki, czas_M, czas_S;
@@ -206,13 +149,13 @@ void MyOnPaint(HDC hdc, status status)
 		std::string str = strs.str();
 		std::wstring stemp = std::wstring(str.begin(), str.end());
 		LPCWSTR sw = stemp.c_str();
-
+/*
 		strs2 << data_acc[i].value;
 		std::string str2 = strs2.str();
 		std::wstring stemp2 = std::wstring(str2.begin(), str2.end());
 		LPCWSTR sw2 = stemp2.c_str();
-
-		strs3 << data_U[200].Y;
+		*/
+		strs3 << data_U[250].Y;
 		std::string str3 = strs3.str();
 		std::wstring stemp3 = std::wstring(str3.begin(), str3.end());
 		LPCWSTR sw3 = stemp3.c_str();
@@ -221,7 +164,7 @@ void MyOnPaint(HDC hdc, status status)
 // Tu wyswietlone obecne temperatury
 		TextOut(hdc, 410, 680, sw, 2);
 		TextOut(hdc, 350, 680, TEXT("T1 : "), 6);
-		TextOut(hdc, 410, 720, sw2, 6);
+	//	TextOut(hdc, 410, 720, sw2, 6);
 		TextOut(hdc, 350, 720, TEXT("T2 : "), 6);
 
 		TextOut(hdc, 500, 640, TEXT("Wejście:"), 9);
@@ -229,8 +172,7 @@ void MyOnPaint(HDC hdc, status status)
 		TextOut(hdc, 870, 640, sw3, 3);
 
     	if (status.drawX)graphics.DrawLine(&pen1, Point((data_U[i - 1].X), (-1) * data_U[i - 1].Y + 200), Point((data_U[i].X),  (-1) * data_U[i].Y + 200));
-		if (status.drawY)graphics.DrawLine(&pen2, Point((data_y[i - 1].X - ignore)+5, data_y[i - 1].Y), Point((data_y[i].X - ignore)+5, data_y[i].Y));
-	//	if (status.drawZ)graphics.DrawLine(&pen3, Point((data_z[i - 1].X - ignore)*status.time_signature+5, data_z[i - 1].Y), Point((data_z[i].X - ignore) *status.time_signature+5, data_z[i].Y));
+		if (status.drawY)graphics.DrawLine(&pen2, Point((data[i - 1].X ), (-0.01) * data[i - 1].Y + 600), Point((data[i].X), (-0.01) * data[i].Y + 600));
 		if (CHART.realtime)Sleep(10);
 	}
 
@@ -251,56 +193,19 @@ void repaintWindow(HWND hWnd, HDC &hdc, PAINTSTRUCT &ps, RECT *drawArea, status 
 }
 
 
-void getData()
-{
-	std::ifstream file;
-	file.open("outputRobotForwardB02.log");
-	double x, y, z;
-	double suma = 0;
-	std::string pomin;
-	logs = 0;
-
-	while (file.eof() == false) {
-		file.seekg(21, std::ios::cur);
-		file >> x;
-		file >> y;
-		file >> z;
-		std::getline(file, pomin);
-
-		acceleration log = { sqrt(x*x + y*y + z*z), false };
-		data_acc.push_back(log);
-		data_y.push_back(Point(logs, (abs((y * 1000) - 200)) / 2));
-		data_z.push_back(Point(logs, (abs((z * 1000) - 200)) / 2));
-		logs++;
-	}
-
-	calc_gravity();
-	for (int i = 0; i < logs; i++)
-		data_acc[i].movement = check(data_acc[i].value);
-
-	check2();
-	calc_gravity();
-	file.close();
-}
-
-
-
 void Begin()
 {
-	pojemnosc Wall, Chamber;
 	Wall.C = 0;
 	Wall.R = 0;
 	Chamber.C = 0;
 	Chamber.R = 0;
 
+	for (int i = 0; i < Time; i++) {
+		Environment.T.push_back(Point(i, 0));
+	}
+
 	// Funkcja wymagajaca ustawienia wartosci poczatkowych
 
-}
-
-int OnCreate(HWND window)
-{
-	getData();
-	return 0;
 }
 
 
@@ -337,7 +242,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 	hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_DRAW));
 
 	// Main message loop:
-	Begin();
+
 	while (GetMessage(&msg, NULL, 0, 0))
 	{
 		if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
@@ -470,8 +375,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	hwndText3 = CreateWindowEx(ES_NUMBER, TEXT("EDIT"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER, 230, 720, 80, 20,
 		hWnd, (HMENU)ID_text4, hInstance, NULL);
 	hwndText4 = CreateWindowEx(ES_NUMBER, TEXT("EDIT"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER, 620, 710, 100, 20,
-		hWnd, (HMENU)ID_text5, hInstance, NULL);
-	// create button and store the handle                                                       
+		hWnd, (HMENU)ID_text5, hInstance, NULL);                                                     
 
 
 
@@ -485,7 +389,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 		WS_CHILD | WS_VISIBLE | BS_AUTORADIOBUTTON,
 		500, 740, 100, 40, hWnd, (HMENU)ID_RBUTTON2, GetModuleHandle(NULL), NULL);
 
-	OnCreate(hWnd);
+	Begin();
 
 	if (!hWnd)
 	{
@@ -522,8 +426,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		wmId = LOWORD(wParam);
 		wmEvent = HIWORD(wParam);
 
-		// MENU & BUTTON messages
-		// Parse the menu selections:
+
 		switch (wmId)
 		{
 		case IDM_ABOUT:
