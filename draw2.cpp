@@ -42,7 +42,6 @@ HWND hwndText0, hwndText1, hwndText2, hwndText3, hwndText4;
 
 
 std::vector<Point> data_U;
-std::vector<Point> data;
 pojemnosc Wall, Chamber, Environment;
 RECT drawArea1 = { 5, 5, 1660, 1200 };
 RECT drawArea2 = { 10, 570, 400, 600 };
@@ -53,12 +52,7 @@ LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK	Buttons(HWND, UINT, WPARAM, LPARAM);
 
-
-double Heat_flow(Point T1, Point T2, double R) {
-	return ((T1.Y- T2.Y) / R);
-}
-
-
+//Mozna to poprawic ale dziala
 double integration(std::vector<Point> Function, int i) {
 
 	double integral = 0, acc = 1000, h = i / acc;
@@ -75,11 +69,31 @@ double integration(std::vector<Point> Function, int i) {
 	return integral;
 }
 
+// Te dwie funkcje jeszcze niedokonczone, dzieja sie dziwne rzeczy
+int Heat_flow(Point T1, Point T2, double R) {
+	return ((T1.Y - T2.Y) / R);
+}
+
+
+void calculateTemp() {
+
+	std::vector<Point> Q_1, Q_2;
+
+	for (int i = 0; i < Time - 10; i++) {
+		Q_1.push_back(Point(i, Heat_flow(Chamber.T[i], Wall.T[i], Chamber.R)));
+		Q_2.push_back(Point(i, Heat_flow(Wall.T[i], Environment.T[i], Chamber.R)));
+
+		Chamber.T.push_back(Point(i, ((1 / Chamber.C) * (integration(data_U, i) - integration(Q_1, i)))));
+		Wall.T.push_back(Point(i, ((1 / Wall.C) * (integration(Q_1, i) - integration(Q_2, i)))));
+	}
+
+}
+
 
 void Input(int type) {
 	
 	data_U.clear();
-	data.clear();
+
 
 	switch (type) {
 
@@ -94,25 +108,18 @@ void Input(int type) {
 					data_U.push_back(Point(i, 0));
 				}
 			}
-
-			for (int i = 0; i < Time - 10; i++) 
-				data.push_back(Point(i, integration(data_U , i)));
+/*			for (int i = 0; i < Time - 10; i++) 
+				data.push_back(Point(i, integration(data_U , i)));*/
 			break;
 
 		case 1:
-			for (int i = 0; i < Time; i++) {
+			for (int i = 0; i < Time; i++) 
 				data_U.push_back(Point(i, U));
-			}
-			for (int i = 0; i < Time - 10; i++)
-				data.push_back(Point(i, integration(data_U, i)));
 			break;
 
 		case 2:
-			for (int i = 0; i < Time; i++) {
+			for (int i = 0; i < Time; i++) 
 				data_U.push_back(Point(i, (U/2)*sin(i/31.847) + U/2));
-			}
-			for (int i = 0; i < Time - 10; i++)
-				data.push_back(Point(i, integration(data_U, i)));
 			break;
 
 		default:
@@ -144,7 +151,7 @@ void MyOnPaint(HDC hdc, status status)
 	
 
 // Pobieranie danych do temperatur
-		std::ostringstream strs, strs2, strs3, grav, kroki, czas_M, czas_S;
+		std::ostringstream strs, strs2, strs3;
 		strs << i / 25;
 		std::string str = strs.str();
 		std::wstring stemp = std::wstring(str.begin(), str.end());
@@ -161,7 +168,7 @@ void MyOnPaint(HDC hdc, status status)
 		LPCWSTR sw3 = stemp3.c_str();
 
 
-// Tu wyswietlone obecne temperatury
+// Tu obecne temperatury
 		TextOut(hdc, 410, 680, sw, 2);
 		TextOut(hdc, 350, 680, TEXT("T1 : "), 6);
 	//	TextOut(hdc, 410, 720, sw2, 6);
@@ -171,8 +178,9 @@ void MyOnPaint(HDC hdc, status status)
 		TextOut(hdc, 800, 640, TEXT("Zmienna:"), 9);
 		TextOut(hdc, 870, 640, sw3, 3);
 
-    	if (status.drawX)graphics.DrawLine(&pen1, Point((data_U[i - 1].X), (-1) * data_U[i - 1].Y + 200), Point((data_U[i].X),  (-1) * data_U[i].Y + 200));
-		if (status.drawY)graphics.DrawLine(&pen2, Point((data[i - 1].X ), (-0.01) * data[i - 1].Y + 600), Point((data[i].X), (-0.01) * data[i].Y + 600));
+    	if (status.drawX)graphics.DrawLine(&pen1, Point((data_U[i - 1].X), (-1) * data_U[i - 1].Y + 100), Point((data_U[i].X),  (-1) * data_U[i].Y + 100));
+	    if (status.drawY)graphics.DrawLine(&pen2, Point((Chamber.T[i - 1].X ), (-1) * Chamber.T[i - 1].Y + 350), Point((Chamber.T[i].X), (-1) * Chamber.T[i].Y + 350));
+		if (status.drawZ)graphics.DrawLine(&pen3, Point((Wall.T[i - 1].X), (-1) * Wall.T[i - 1].Y + 600), Point((Wall.T[i].X), (-1) * Wall.T[i].Y + 600));
 		if (CHART.realtime)Sleep(10);
 	}
 
@@ -199,13 +207,12 @@ void Begin()
 	Wall.R = 0;
 	Chamber.C = 0;
 	Chamber.R = 0;
+	Wall.T.push_back (Point(0,0));
+	Chamber.T.push_back(Point(0,0));
 
 	for (int i = 0; i < Time; i++) {
 		Environment.T.push_back(Point(i, 0));
 	}
-
-	// Funkcja wymagajaca ustawienia wartosci poczatkowych
-
 }
 
 
@@ -473,7 +480,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 
 
-
+			calculateTemp();
 			repaintWindow(hWnd, hdc, ps, NULL, CHART);
 			break;
 		case ID_RBUTTON0:
