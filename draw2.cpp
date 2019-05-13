@@ -16,7 +16,7 @@
 HINSTANCE hInst;								
 TCHAR szTitle[MAX_LOADSTRING];					// The title bar text
 TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
-int type, Time = 1700;
+int type, Time = 32000;
 double U;
 
 struct status
@@ -31,7 +31,7 @@ struct status
 
 struct pojemnosc
 {	
-	std::vector<Point> T;
+	std::vector<double> T;
 	double C;
 	double R;
 };
@@ -41,7 +41,7 @@ HWND hwndButton;
 HWND hwndText0, hwndText1, hwndText2, hwndText3, hwndText4;
 
 
-std::vector<Point> data_U;
+std::vector<double> data_U, data;
 pojemnosc Wall, Chamber, Environment;
 RECT drawArea1 = { 5, 5, 1660, 1200 };
 RECT drawArea2 = { 10, 570, 400, 600 };
@@ -52,74 +52,78 @@ LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK	Buttons(HWND, UINT, WPARAM, LPARAM);
 
-//Mozna to poprawic ale dziala
-double integration(std::vector<Point> Function, int i) {
+std::vector<double> integration(std::vector<double> Function) {
 
-	double integral = 0, acc = 1000, h = i / acc;
+	std::vector<double> integral;
 
-	for (int j = 1; j < acc; j++)
+	integral.push_back(0);
+
+	for (int j = 1 ; j < Function.size() ; j++)
 	{
-		integral = integral + Function[j * h].Y;
+		integral.push_back(integral[j-1] + (Function[j - 1] + Function[j])/2) ;
 	}
-
-	integral = integral + Function[0].Y / 2;
-	integral = integral + Function[i].Y / 2;
-	integral = integral * h;
 
 	return integral;
 }
-
+/*
 // Te dwie funkcje jeszcze niedokonczone, dzieja sie dziwne rzeczy
-int Heat_flow(Point T1, Point T2, double R) {
-	return ((T1.Y - T2.Y) / R);
+double Heat_flow(Point T1, Point T2, double R) {
+	return double((T1.Y - T2.Y) / R);
 }
 
 
 void calculateTemp() {
 
 	std::vector<Point> Q_1, Q_2;
+	//Chamber.T.clear();
+	//Wall.T.clear();
 
 	for (int i = 0; i < Time - 10; i++) {
 		Q_1.push_back(Point(i, Heat_flow(Chamber.T[i], Wall.T[i], Chamber.R)));
 		Q_2.push_back(Point(i, Heat_flow(Wall.T[i], Environment.T[i], Chamber.R)));
 
-		Chamber.T.push_back(Point(i, ((1 / Chamber.C) * (integration(data_U, i) - integration(Q_1, i)))));
-		Wall.T.push_back(Point(i, ((1 / Wall.C) * (integration(Q_1, i) - integration(Q_2, i)))));
+		Chamber.T.push_back(Point(i, (double(1 / Chamber.C) * double(integration(data_U, i) - integration(Q_1, i)))));
+		Wall.T.push_back(Point(i, (double(1 / Wall.C) * double(integration(Q_1, i) - integration(Q_2, i)))));
 	}
 
-}
+}*/
 
 
 void Input(int type) {
 	
 	data_U.clear();
+	data.clear();
 
 
 	switch (type) {
 
-		case 0:  // problem z rysowaniem, w forze jest i - 10
+		case 0:  
 			for (int i = 0, k = 0; i < Time; i++) {
-				if ((i >= k*100) && (i < k*100 + 100)) {
-					data_U.push_back(Point(i, U));
+				if ((i >= k*1000) && (i < k*1000 + 1000)) {
+					data_U.push_back(U);
 				}
-				else if ( i % 100 == 0)
+				else if ( i % 1000 == 0)
 				k += 2;
 				else{	
-					data_U.push_back(Point(i, 0));
+					data_U.push_back(0);
 				}
 			}
-/*			for (int i = 0; i < Time - 10; i++) 
-				data.push_back(Point(i, integration(data_U , i)));*/
+
+				data = integration(data_U);
 			break;
 
 		case 1:
 			for (int i = 0; i < Time; i++) 
-				data_U.push_back(Point(i, U));
+				data_U.push_back(U);
+			
+				data = integration(data_U);
 			break;
 
 		case 2:
 			for (int i = 0; i < Time; i++) 
-				data_U.push_back(Point(i, (U/2)*sin(i/31.847) + U/2));
+				data_U.push_back((U/2)*sin(i/318.47) + U/2);
+	
+				data = integration(data_U);
 			break;
 
 		default:
@@ -143,47 +147,46 @@ void MyOnPaint(HDC hdc, status status)
 		10.0f,  // dash length 15
 		8.0f };  // space length 4
 	chart2.SetDashPattern(dashVals, 4);
-	graphics.DrawLine(&chart1, 5, 5, 5, 840);
-	graphics.DrawLine(&chart1, 5, 100 * status.amplitude, 1600, 100 * status.amplitude);
-	for (int i = 50; i < 850; i += 50)graphics.DrawLine(&chart2, 5, i, 1600, i);
-	for (int i = 5; i < 2300; i += 50*status.time_signature)graphics.DrawLine(&chart2, i, 620, i, 660);
-	for (int i = 1; i < Time - 10; i++) {
-	
+		graphics.DrawLine(&chart1, 5, 5, 5, 840);
+		graphics.DrawLine(&chart1, 5, 300 * status.amplitude, 1600, 300 * status.amplitude);
+		for (int i = 50; i < 850; i += 50)graphics.DrawLine(&chart2, 5, i, 1600, i);
+	    for (int i = 5; i < 2300; i += 50*status.time_signature)graphics.DrawLine(&chart2, i, 620, i, 660);
+	for (int i = 1; i < (Time - 30); i++) {
 
-// Pobieranie danych do temperatur
+
+		// Pobieranie danych do temperatur
 		std::ostringstream strs, strs2, strs3;
 		strs << i / 25;
 		std::string str = strs.str();
 		std::wstring stemp = std::wstring(str.begin(), str.end());
 		LPCWSTR sw = stemp.c_str();
-/*
-		strs2 << data_acc[i].value;
+		
+		strs2 << i;
 		std::string str2 = strs2.str();
 		std::wstring stemp2 = std::wstring(str2.begin(), str2.end());
 		LPCWSTR sw2 = stemp2.c_str();
-		*/
-		strs3 << data_U[250].Y;
+		
+		strs3 << data_U[250];
 		std::string str3 = strs3.str();
 		std::wstring stemp3 = std::wstring(str3.begin(), str3.end());
 		LPCWSTR sw3 = stemp3.c_str();
 
 
-// Tu obecne temperatury
-		TextOut(hdc, 410, 680, sw, 2);
+		// Tu obecne temperatury
+		TextOut(hdc, 410, 680, sw, 4);
 		TextOut(hdc, 350, 680, TEXT("T1 : "), 6);
-	//	TextOut(hdc, 410, 720, sw2, 6);
+		TextOut(hdc, 410, 720, sw2, 4);
 		TextOut(hdc, 350, 720, TEXT("T2 : "), 6);
 
 		TextOut(hdc, 500, 640, TEXT("Wejście:"), 9);
 		TextOut(hdc, 800, 640, TEXT("Zmienna:"), 9);
-		TextOut(hdc, 870, 640, sw3, 3);
+		TextOut(hdc, 870, 640, sw3, 4);
 
-    	if (status.drawX)graphics.DrawLine(&pen1, Point((data_U[i - 1].X), (-1) * data_U[i - 1].Y + 100), Point((data_U[i].X),  (-1) * data_U[i].Y + 100));
-	    if (status.drawY)graphics.DrawLine(&pen2, Point((Chamber.T[i - 1].X ), (-1) * Chamber.T[i - 1].Y + 350), Point((Chamber.T[i].X), (-1) * Chamber.T[i].Y + 350));
-		if (status.drawZ)graphics.DrawLine(&pen3, Point((Wall.T[i - 1].X), (-1) * Wall.T[i - 1].Y + 600), Point((Wall.T[i].X), (-1) * Wall.T[i].Y + 600));
-		if (CHART.realtime)Sleep(10);
+		if (status.drawX)graphics.DrawLine(&pen1, Point((i - 1)/10 + 5 , -1 * data_U[i-1] + 300), Point(i/10 + 5 , -1 * data_U[i] + 300));
+		if (status.drawY)graphics.DrawLine(&pen2, Point((i - 1)/10 + 5 , -0.001 * data[i-1] + 300), Point(i/10 + 5 , -0.001 * data[i] + 300));
+	 //	if (status.drawZ)graphics.DrawLine(&pen3, Point((Wall.T[i - 1].X+5), (-0.1) * Wall.T[i - 1].Y + 300), Point((Wall.T[i].X+5), (-0.1) * Wall.T[i].Y + 300));
+		 //if (CHART.realtime)Sleep(10);
 	}
-
 }
 
 
@@ -207,11 +210,11 @@ void Begin()
 	Wall.R = 0;
 	Chamber.C = 0;
 	Chamber.R = 0;
-	Wall.T.push_back (Point(0,0));
-	Chamber.T.push_back(Point(0,0));
+	Wall.T.push_back (0);
+	Chamber.T.push_back(0);
 
 	for (int i = 0; i < Time; i++) {
-		Environment.T.push_back(Point(i, 0));
+		Environment.T.push_back(0);
 	}
 }
 
@@ -480,7 +483,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 
 
-			calculateTemp();
+		//	calculateTemp();
 			repaintWindow(hWnd, hdc, ps, NULL, CHART);
 			break;
 		case ID_RBUTTON0:
