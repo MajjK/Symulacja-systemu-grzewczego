@@ -1,1 +1,1 @@
-# Symulacja-systemu-grzewczego
+# Heating-system-simulation
